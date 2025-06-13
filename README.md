@@ -82,12 +82,10 @@ TGBotSwiftTemplate/
 │   │   └── XEverywhereController.swift  # Global command handlers
 │   │
 │   ├── Models/                   # Database models (Fluent ORM)
-│   │   ├── User.swift           # User session and preferences
-│   │   └── DataEntry.swift      # Example data model
+│   │   └── User.swift           # User session and preferences
 │   │
 │   ├── Migrations/              # Database schema migrations
-│   │   ├── CreateUser.swift
-│   │   └── CreateDataEntry.swift
+│   │   └── CreateUser.swift
 │   │
 │   ├── Telegram/
 │   │   ├── Router/              # Routing system
@@ -247,28 +245,6 @@ let markup = TGReplyKeyboardMarkup(keyboard: [
 let inline = TGInlineKeyboardMarkup(inlineKeyboard: [
     [TGInlineKeyboardButton(text: "Click me", callbackData: "action:123")]
 ])
-```
-
-### Database Operations
-
-Using Fluent ORM for database operations:
-
-```swift
-// Create
-let entry = DataEntry(userId: user.id!, department: "Sales")
-try await entry.save(on: db)
-
-// Read
-let entries = try await DataEntry.query(on: db)
-    .filter(\.$userId == user.id!)
-    .all()
-
-// Update
-entry.quantity = "100"
-try await entry.save(on: db)
-
-// Delete
-try await entry.delete(on: db)
 ```
 
 ## 🌐 Localization
