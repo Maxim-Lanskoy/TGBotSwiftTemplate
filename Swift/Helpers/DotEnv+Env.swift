@@ -5,16 +5,29 @@
 //  Created by Maxim Lanskoy on 13.06.2025.
 //
 
-import Vapor
+import Foundation
 import SwiftDotenv
 
 // MARK: - Universal Environment Variable Helper.
+public struct EnvError: Error, CustomStringConvertible {
+    public let message: String
+    public var description: String { message }
+}
+
 public final class Env {
     public static func get(_ key: String) throws -> String {
-        if let value = Environment.get(key) ?? Dotenv[key]?.stringValue {
+        if let value = ProcessInfo.processInfo.environment[key] ?? Dotenv[key]?.stringValue {
             return value
         } else {
-            throw Abort(.internalServerError, reason: "Environment variable \(key) not set.")
+            throw EnvError(message: "Environment variable \(key) not set.")
+        }
+    }
+
+    public static func get(_ key: String, default defaultValue: String) throws -> String {
+        if let value = ProcessInfo.processInfo.environment[key] ?? Dotenv[key]?.stringValue {
+            return value
+        } else {
+            return defaultValue
         }
     }
 }

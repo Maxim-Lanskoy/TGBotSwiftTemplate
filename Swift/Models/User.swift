@@ -5,7 +5,6 @@
 //  Created by Maxim Lanskoy on 13.06.2025.
 //
 
-import Vapor
 import Fluent
 import Foundation
 import SwiftTelegramBot

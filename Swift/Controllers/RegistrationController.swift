@@ -6,8 +6,7 @@
 //
 
 import Foundation
-import LingoVapor
-import Lingo
+@preconcurrency import Lingo
 import SwiftTelegramBot
 
 // MARK: - Registrarion Controller Logic

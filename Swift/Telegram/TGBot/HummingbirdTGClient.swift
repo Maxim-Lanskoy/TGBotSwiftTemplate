@@ -1,27 +1,30 @@
 //
-//  VaporTGClient.swift
+//  HummingbirdTGClient.swift
 //  TGBotSwiftTemplate
 //
 //  Created by Maxim Lanskoy on 13.06.2025.
 //
 
 import Foundation
-import Vapor
+import AsyncHTTPClient
+import NIOCore
+import NIOFoundationCompat
+import Logging
 import SwiftTelegramBot
 
 private struct TGEmptyParams: Encodable {}
 
-/// Vapor-based TGClient that uses Vapor's HTTP client instead of URLSession.
-/// Integrates better with Vapor's event loop system.
-public final class VaporTGClient: TGClientPrtcl, Sendable {
+/// AsyncHTTPClient-based TGClient for use with Hummingbird.
+/// Lightweight HTTP client that integrates with Swift NIO.
+public final class HummingbirdTGClient: TGClientPrtcl, Sendable {
 
     public typealias HTTPMediaType = SwiftTelegramBot.HTTPMediaType
 
-    private let client: any Vapor.Client
+    private let httpClient: HTTPClient
     private let logger: Logger
 
-    public init(client: any Vapor.Client, logger: Logger = .init(label: "VaporTGClient")) {
-        self.client = client
+    public init(httpClient: HTTPClient, logger: Logger = .init(label: "HummingbirdTGClient")) {
+        self.httpClient = httpClient
         self.logger = logger
     }
 
@@ -31,7 +34,9 @@ public final class VaporTGClient: TGClientPrtcl, Sendable {
         params: Params? = nil,
         as mediaType: HTTPMediaType? = nil
     ) async throws -> Response {
-        var clientRequest = ClientRequest(method: .POST, url: URI(string: url.absoluteString), headers: HTTPHeaders())
+        var request = HTTPClientRequest(url: url.absoluteString)
+        request.method = .POST
+
         if mediaType == .formData || mediaType == nil {
             let rawMultipart: (body: NSMutableData, boundary: String)
             if let currentParams: Params = params {
@@ -39,19 +44,20 @@ public final class VaporTGClient: TGClientPrtcl, Sendable {
             } else {
                 rawMultipart = try TGEmptyParams().toMultiPartFormData(log: logger)
             }
-            clientRequest.headers.add(name: "Content-Type", value: "multipart/form-data; boundary=\(rawMultipart.boundary)")
-            let buffer = ByteBuffer.init(data: rawMultipart.body as Data)
-            clientRequest.body = buffer
+            request.headers.add(name: "Content-Type", value: "multipart/form-data; boundary=\(rawMultipart.boundary)")
+            request.body = .bytes(ByteBuffer(data: rawMultipart.body as Data))
         } else {
-            let vaporMediaType: Vapor.HTTPMediaType = if let mediaType {
-                .init(type: mediaType.type, subType: mediaType.subType, parameters: mediaType.parameters)
-            } else {
-                .json
-            }
-            try clientRequest.content.encode(params ?? (TGEmptyParams() as! Params), as: vaporMediaType)
+            // JSON encoding - SDK types have their own CodingKeys for snake_case
+            let data = try JSONEncoder().encode(params ?? (TGEmptyParams() as! Params))
+            request.headers.add(name: "Content-Type", value: "application/json")
+            request.body = .bytes(ByteBuffer(data: data))
         }
-        let clientResponse: ClientResponse = try await client.send(clientRequest)
-        let telegramContainer = try clientResponse.content.decode(TGTelegramContainer<Response>.self)
+
+        let response = try await httpClient.execute(request, timeout: .seconds(30))
+        let body = try await response.body.collect(upTo: 10 * 1024 * 1024) // 10MB limit
+
+        // Don't use convertFromSnakeCase - SwiftTelegramBot types have their own CodingKeys
+        let telegramContainer = try JSONDecoder().decode(TGTelegramContainer<Response>.self, from: body)
         return try processContainer(telegramContainer)
     }
 

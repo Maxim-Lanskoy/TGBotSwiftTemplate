@@ -5,40 +5,38 @@
 //  Created by Maxim Lanskoy on 13.06.2025.
 //
 
-import Vapor
 import Foundation
 import Logging
 import Fluent
-import Lingo
-import LingoVapor
+@preconcurrency import Lingo
 import SwiftTelegramBot
 
 // MARK: - Main Unified Dispatcher
 
 final class TGDispatcher: TGDefaultDispatcher, @unchecked Sendable {
-    
-    private let db: any Database
-    let lingoVapor: LingoProvider
 
-    init(bot: TGBot, app: Application) {
-        self.db = app.db
-        self.lingoVapor = app.lingoVapor
-        super.init(bot: bot, logger: app.logger)
+    private let db: any Database
+    let lingo: Lingo
+
+    init(bot: TGBot, appState: AppState) {
+        self.db = appState.db
+        self.lingo = appState.lingo
+        super.init(bot: bot, logger: appState.logger)
     }
-    
+
     override func handle() async {
         // Register global commands controller
         let globalCommands = GlobalCommandsController(
             bot: bot,
             db: db,
-            lingoVapor: lingoVapor
+            lingo: lingo
         )
         await globalCommands.registerHandlers(dispatcher: self)
 
         // Register catch-all router handler
         await addRouterHandler()
     }
-    
+
     // MARK: - Router Handler (Lowest Priority - Catch-all)
 
     private func addRouterHandler() async {
@@ -61,10 +59,9 @@ final class TGDispatcher: TGDefaultDispatcher, @unchecked Sendable {
                 _ = try? await self.bot.sendMessage(params: backup)
                 return
             }
-            
+
             // Get user session with caching
             let session = try await User.cachedSession(for: entity, db: self.db)
-            let lingo = try self.lingoVapor.lingo()
 
             // Route to appropriate controller
             let props: [String: Int64] = ["session": session.telegramId]
@@ -75,7 +72,7 @@ final class TGDispatcher: TGDefaultDispatcher, @unchecked Sendable {
                 update: update,
                 properties: props,
                 db: self.db,
-                lingo: lingo
+                lingo: self.lingo
             )
         }))
     }

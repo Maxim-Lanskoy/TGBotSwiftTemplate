@@ -1,16 +1,15 @@
 # Telegram Bot Swift Template 🤖
 
-[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)](https://github.com/Maxim-Lanskoy/GPTGram/actions) 
+[![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)](https://github.com/Maxim-Lanskoy/GPTGram/actions)
 [![Swift](https://img.shields.io/badge/Swift-6.2-orange)](https://github.com/swiftlang/swift/releases/tag/swift-6.2-RELEASE)
-[![Vapor](https://img.shields.io/badge/Vapor-4.120.0-mediumslateblue)](https://github.com/vapor/vapor/releases/tag/4.120.0) 
+[![Hummingbird](https://img.shields.io/badge/Hummingbird-2.10-blue)](https://github.com/hummingbird-project/hummingbird)
 
 A Telegram Bot template built with Swift, using a router-controller architecture, multiple languages, and database persistence.
 
-<p align="center">[ <a href="https://docs.vapor.codes">Vapor Documentation</a> ]  
-  [ <a href="https://docs.vapor.codes/fluent/overview/#fluent">Fluent ORM / SQLite</a> ]  
-  [ <a href="https://core.telegram.org/bots/api">Telegram Bot API</a> ]  
-  [ <a href="https://github.com/nerzh/swift-telegram-sdk">Swift Telegram SDK</a> ]  
-  [ <a href="https://openai.com/index/gpt-4-1/">OpenAI GPT-4.1</a> ]
+<p align="center">[ <a href="https://docs.hummingbird.codes">Hummingbird Documentation</a> ]
+  [ <a href="https://docs.vapor.codes/fluent/overview/#fluent">Fluent ORM / PostgreSQL</a> ]
+  [ <a href="https://core.telegram.org/bots/api">Telegram Bot API</a> ]
+  [ <a href="https://github.com/nerzh/swift-telegram-sdk">Swift Telegram SDK</a> ]
 </p>
 
 ## 🎯 Purpose
@@ -18,9 +17,10 @@ A Telegram Bot template built with Swift, using a router-controller architecture
 This template provides a robust foundation for building Telegram bots in Swift with:
 - **State-based navigation** using a router-controller pattern
 - **Multi-language support** with dynamic locale switching
-- **User session management** with SQLite database persistence
+- **User session management** with PostgreSQL database persistence
 - **Modern Swift concurrency** with async/await
 - **Session caching** for improved performance
+- **Lightweight HTTP server** with Hummingbird for webhooks/health checks
 
 Perfect for creating bots that need to manage complex user interactions, multiple conversation states, and persistent data.
 
@@ -30,8 +30,8 @@ Perfect for creating bots that need to manage complex user interactions, multipl
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     TGBot + Dispatcher                      │
-│    (Bot instance stored in Vapor Application storage)       │
+│                     TGBot + Dispatcher                       │
+│         (Bot instance stored in AppState)                    │
 └─────────────────────────────────────────────────────────────┘
                                │
           ┌────────────────────┼────────────────────┐
@@ -99,9 +99,8 @@ TGBotSwiftTemplate/
 │   │   │   └── Router+Helpers.swift
 │   │   │
 │   │   └── TGBot/               # Bot infrastructure
-│   │       ├── BotService.swift  # Vapor Application extension
-│   │       ├── TGDispatcher.swift # Unified dispatcher
-│   │       └── VaporTGClient.swift # Vapor HTTP client for TG API
+│   │       ├── TGDispatcher.swift        # Unified dispatcher
+│   │       └── HummingbirdTGClient.swift # AsyncHTTPClient for TG API
 │   │
 │   ├── Helpers/
 │   │   ├── TGBot+Extensions.swift # Convenience extensions
@@ -110,15 +109,13 @@ TGBotSwiftTemplate/
 │   │   └── DotEnv+Env.swift      # Environment helpers
 │   │
 │   ├── entrypoint.swift         # Application entry point
-│   ├── configure.swift          # Vapor configuration
-│   └── routes.swift             # HTTP routes (if needed)
+│   ├── configure.swift          # Application configuration
+│   └── routes.swift             # Router store for controllers
 │
-├── Localizations/               # Multi-language support
-│   ├── en.json                 # English translations
-│   └── uk.json                 # Ukrainian translations
-│
-├── SQLite/                      # Database files (gitignored)
-│   └── .gitkeep
+├── Resources/
+│   └── Localizations/           # Multi-language support
+│       ├── en.json              # English translations
+│       └── uk.json              # Ukrainian translations
 │
 ├── Public/                      # Static files for web routes
 │   └── favicon.ico
@@ -135,6 +132,7 @@ TGBotSwiftTemplate/
 
 - **Swift 6.2+** toolchain
 - **Xcode 16+** (optional, for IDE support)
+- **Docker** (for PostgreSQL)
 - **Telegram Bot Token** from [@BotFather](https://t.me/botfather)
 
 ### Installation
@@ -145,33 +143,72 @@ TGBotSwiftTemplate/
    cd TGBotSwiftTemplate
    ```
 
-2. **Configure environment**:
+2. **Start PostgreSQL with Docker**:
+   ```bash
+   docker run -d \
+     --name tgbot-postgres \
+     -e POSTGRES_USER=tgbot \
+     -e POSTGRES_PASSWORD=your-secure-password \
+     -e POSTGRES_DB=tgbot_db \
+     -p 5432:5432 \
+     -v tgbot_pgdata:/var/lib/postgresql/data \
+     postgres:16-alpine
+   ```
+
+3. **Configure environment**:
    ```bash
    cp .env.example .env
    ```
-   Edit `.env` and add your bot token:
-   ```
+   Edit `.env` with your settings:
+   ```env
+   # Telegram Configuration
    TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
+
+   # PostgreSQL Connection
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_USER=tgbot
+   DB_PASSWORD=your-secure-password
+   DB_NAME=tgbot_db
    ```
 
-3. **Update configuration**:
-   
+4. **Update configuration**:
+
    Edit `Swift/configure.swift` and replace the following:
    - `projectPath`: Update to your actual project path
    - `owner` and `helper`: Replace with your Telegram user IDs
    - `@TGUserName`: Replace with your Telegram username in localizations
 
-4. **Build and run**:
+5. **Build and run**:
    ```bash
    swift build
    swift run
    ```
 
-   Or using Vapor CLI:
-   ```bash
-   vapor build
-   vapor run
-   ```
+### Docker Commands Reference
+
+```bash
+# Check if container is running
+docker ps
+
+# View logs
+docker logs tgbot-postgres
+
+# Stop container
+docker stop tgbot-postgres
+
+# Start existing container
+docker start tgbot-postgres
+
+# Remove container (data persists in volume)
+docker rm tgbot-postgres
+
+# Connect to psql shell
+docker exec -it tgbot-postgres psql -U tgbot -d tgbot_db
+
+# Remove volume (WARNING: deletes all data)
+docker volume rm tgbot_pgdata
+```
 
 ### Finding Your Telegram User ID
 
@@ -197,7 +234,7 @@ To get your Telegram user ID:
 
 3. **Message Processing**:
    ```swift
-   Update arrives → RouterStore finds current controller → 
+   Update arrives → RouterStore finds current controller →
    Controller processes → Updates user state → Sends response
    ```
 
@@ -213,7 +250,7 @@ To get your Telegram user ID:
            }
            await processRouterForEachName(router)
        }
-       
+
        func onMyCommand(context: Context) async throws -> Bool {
            try await context.respond("Hello from my feature!")
            return true
@@ -259,7 +296,7 @@ The template includes built-in multi-language support:
 2. **Use in code**:
    ```swift
    let welcomeText = lingo.localize("welcome", locale: user.locale)
-   let greeting = lingo.localize("greeting.message", locale: user.locale, 
+   let greeting = lingo.localize("greeting.message", locale: user.locale,
                                   interpolations: ["full-name": user.name])
    ```
 
@@ -272,8 +309,15 @@ The template includes built-in multi-language support:
 
 ### Environment Variables
 
-- `TELEGRAM_BOT_TOKEN` - Your bot token from BotFather (required)
-- `DATABASE_URL` - Custom database URL (optional, defaults to SQLite)
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `TELEGRAM_BOT_TOKEN` | Bot token from BotFather | Yes |
+| `DB_HOST` | PostgreSQL host | Yes |
+| `DB_PORT` | PostgreSQL port (default: 5432) | No |
+| `DB_USER` | PostgreSQL username | Yes |
+| `DB_PASSWORD` | PostgreSQL password | Yes |
+| `DB_NAME` | PostgreSQL database name | Yes |
+| `PG_CONN_STR` | Full PostgreSQL connection URL (alternative) | No |
 
 ### Bot Settings
 
@@ -282,26 +326,15 @@ In `configure.swift`:
 - `allowedUsers` - Array of authorized user IDs (remove for public access)
 - `SupportedLocale` - Enum with available languages and their flags
 
-### Database Options
-
-```swift
-// SQLite file (default)
-app.databases.use(.sqlite(.file("path/to/db.sqlite")), as: .sqlite)
-
-// In-memory (for testing)
-app.databases.use(.sqlite(.memory), as: .sqlite)
-
-// PostgreSQL (change driver dependency)
-app.databases.use(.postgres(configuration: ...), as: .psql)
-```
-
 ## 📚 Dependencies
 
-- **[Vapor](https://vapor.codes)** - Web framework and server
+- **[Hummingbird](https://github.com/hummingbird-project/hummingbird)** - Lightweight Swift HTTP server
 - **[Fluent](https://docs.vapor.codes/fluent/overview/)** - ORM for database operations
+- **[FluentPostgresDriver](https://github.com/vapor/fluent-postgres-driver)** - PostgreSQL driver
+- **[AsyncHTTPClient](https://github.com/swift-server/async-http-client)** - HTTP client for Telegram API
 - **[SwiftTelegramBot](https://github.com/nerzh/swift-telegram-sdk)** - Telegram Bot API client
 - **[swift-dotenv](https://github.com/thebarndog/swift-dotenv)** - Environment file support
-- **[Lingo-Vapor](https://github.com/vapor-community/Lingo-Vapor)** - Localization support
+- **[Lingo](https://github.com/miroslavkovac/Lingo)** - Localization support
 
 ## 🛠️ Advanced Features
 
@@ -340,8 +373,12 @@ try await session.saveAndCache(in: db)
 await session.invalidateCache()
 ```
 
+### Health Check Endpoint
+
+Hummingbird provides a health check endpoint at `http://localhost:8080/health` for monitoring.
+
 ## 🙏 Acknowledgments
 
-- [Vapor](https://vapor.codes) team for the excellent web framework
+- [Hummingbird](https://github.com/hummingbird-project/hummingbird) team for the excellent HTTP framework
 - [swift-telegram-sdk](https://github.com/nerzh/swift-telegram-sdk) for Telegram integration
 - Swift community for the amazing language and tooling

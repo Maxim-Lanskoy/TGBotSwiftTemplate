@@ -5,10 +5,8 @@
 //  Created by Maxim Lanskoy on 13.06.2025.
 //
 
-import Vapor
-import FluentSQLiteDriver
-import Lingo
-import LingoVapor
+import Fluent
+@preconcurrency import Lingo
 import SwiftTelegramBot
 
 /// Controller for global commands (/help, /settings, /buttons)
@@ -16,12 +14,12 @@ final class GlobalCommandsController: @unchecked Sendable {
 
     let bot: TGBot
     let db: any Database
-    let lingoVapor: LingoProvider
+    let lingo: Lingo
 
-    init(bot: TGBot, db: any Database, lingoVapor: LingoProvider) {
+    init(bot: TGBot, db: any Database, lingo: Lingo) {
         self.bot = bot
         self.db = db
-        self.lingoVapor = lingoVapor
+        self.lingo = lingo
     }
 
     // MARK: - Registration
@@ -49,7 +47,6 @@ final class GlobalCommandsController: @unchecked Sendable {
         // AUTH: Comment out this block to disable authorization
         guard allowedUsers.contains(fromId.id) else { return }
 
-        let lingo = try lingoVapor.lingo()
         let session = try await User.cachedSession(for: fromId, db: db)
 
         let helpText = generateHelpText(lingo: lingo, session: session)
@@ -62,7 +59,6 @@ final class GlobalCommandsController: @unchecked Sendable {
         // AUTH: Comment out this block to disable authorization
         guard allowedUsers.contains(fromId.id) else { return }
 
-        let lingo = try lingoVapor.lingo()
         let session = try await User.cachedSession(for: fromId, db: db)
 
         let settingsController = Controllers.settingsController
@@ -79,7 +75,6 @@ final class GlobalCommandsController: @unchecked Sendable {
         guard allowedUsers.contains(fromId.id) else { return }
 
         let session = try await User.cachedSession(for: fromId, db: db)
-        let lingo = try lingoVapor.lingo()
 
         if let controller = Controllers.all.first(where: { $0.routerName == session.routerName }),
            let markup = controller.generateControllerKB(session: session, lingo: lingo) {
@@ -91,19 +86,19 @@ final class GlobalCommandsController: @unchecked Sendable {
     // MARK: - Helper Methods
 
     private func generateHelpText(lingo: Lingo, session: User) -> String {
-        
+
         let welcome = lingo.localize("welcome", locale: session.locale)
         let hereAreTheCommands = lingo.localize("here.are.commands", locale: session.locale)
         let helpMainMenu = lingo.localize("help.main.menu", locale: session.locale)
         let helpShowButtons = lingo.localize("help.show.buttons", locale: session.locale)
         let settingsButtons = lingo.localize("settings.title", locale: session.locale)
-        
+
         let howToUse = lingo.localize("how.to.use", locale: session.locale)
         let howToShowButtons = lingo.localize("how.to.show.buttons", locale: session.locale)
         let howToSettings = lingo.localize("how.to.settings", locale: session.locale)
-                    
+
         let enjoyChatting = lingo.localize("enjoy.chatting", locale: session.locale)
-        
+
         return """
         <b>TGBotSwiftTemplate Help</b>
 

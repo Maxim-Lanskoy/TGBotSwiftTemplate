@@ -5,28 +5,29 @@
 //  Created by Maxim Lanskoy on 13.06.2025.
 //
 
-import Vapor
+import Hummingbird
 import Logging
 import NIOCore
 import NIOPosix
 
-// MARK: - Setting up Vapor Application.
+// MARK: - Setting up Hummingbird Application.
 @main
 enum Entrypoint {
     static func main() async throws {
-        var env = try Environment.detect()
-        try LoggingSystem.bootstrap(from: &env)
-        
-        let app = try await Application.make(env)
+        // Setup logging
+        LoggingSystem.bootstrap { label in
+            var handler = StreamLogHandler.standardOutput(label: label)
+            handler.logLevel = .info
+            return handler
+        }
+
+        let logger = Logger(label: "TGBotSwiftTemplate")
 
         do {
-            try await configure(app)
-            try await app.execute()
+            try await configure(logger: logger)
         } catch {
-            app.logger.report(error: error)
-            try? await app.asyncShutdown()
+            logger.error("Failed to start application: \(error)")
             throw error
         }
-        try await app.asyncShutdown()
     }
 }
