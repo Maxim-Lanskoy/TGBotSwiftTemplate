@@ -8,7 +8,7 @@
 import Foundation
 import LingoVapor
 import Lingo
-@preconcurrency import SwiftTelegramSdk
+import SwiftTelegramBot
 
 // MARK: - Main Controller Logic
 final class MainController: TGControllerBase, @unchecked Sendable {
@@ -50,7 +50,7 @@ final class MainController: TGControllerBase, @unchecked Sendable {
         let settingsController = Controllers.settingsController
         try await settingsController.showSettingsMenu(context: context)
         context.session.routerName = settingsController.routerName
-        try await context.session.save(on: context.db)
+        try await context.session.saveAndCache(in: context.db)
         return true
     }
                 

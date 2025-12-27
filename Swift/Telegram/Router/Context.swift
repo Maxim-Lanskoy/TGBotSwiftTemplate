@@ -9,7 +9,7 @@ import Foundation
 import Dispatch
 import Fluent
 import Lingo
-@preconcurrency import SwiftTelegramSdk
+import SwiftTelegramBot
 
 public class Context {
 	typealias T = Context

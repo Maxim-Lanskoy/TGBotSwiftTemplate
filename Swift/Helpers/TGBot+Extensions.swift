@@ -7,7 +7,7 @@
 
 import Foundation
 import Lingo
-@preconcurrency import SwiftTelegramSdk
+import SwiftTelegramBot
 
 extension Context {
     var session: User {
@@ -31,7 +31,7 @@ public class TGControllerBase: @unchecked Sendable {
     
     public func generateControllerKB(session: User, lingo: Lingo) -> TGReplyMarkup? { return nil }
     
-    public func attachHandlers(to bot: SwiftTelegramSdk.TGBot, lingo: Lingo) async { }
+    public func attachHandlers(to bot: SwiftTelegramBot.TGBot, lingo: Lingo) async { }
     
     public func unmatched(context: Context) async throws -> Bool {
         guard let message = context.update.message else { return false }

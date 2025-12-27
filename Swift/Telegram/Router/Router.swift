@@ -8,7 +8,7 @@
 import Foundation
 import Fluent
 import Lingo
-@preconcurrency import SwiftTelegramSdk
+import SwiftTelegramBot
 
 public class Router {
 	public typealias Handler = (_ context: Context) async throws -> Bool
@@ -70,7 +70,6 @@ public class Router {
         paths.append(Path(.commands(commands), handler))
     }
     
-    @preconcurrency
     @discardableResult
     public func process(update: TGUpdate, properties: [String: User] = [:], db: any Database, lingo: Lingo) async throws -> Bool {
         let string = update.message?.extractCommand() ?? ""

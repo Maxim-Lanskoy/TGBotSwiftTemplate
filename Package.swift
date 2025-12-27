@@ -1,4 +1,4 @@
-//  swift-tools-version: 6.1
+//  swift-tools-version: 6.2
 //
 //  Package.swift
 //  TGBotSwiftTemplate
@@ -15,15 +15,15 @@ let package = Package(
     ],
     dependencies: [
         // 💧 A server-side Swift web framework.
-        .package(url: "https://github.com/vapor/vapor.git", from: "4.115.0"),
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.120.0"),
         // 🗄 An ORM for SQL and NoSQL databases.
-        .package(url: "https://github.com/vapor/fluent.git", from: "4.12.0"),
+        .package(url: "https://github.com/vapor/fluent.git", from: "4.13.0"),
         // 🪶 Fluent driver for SQLite.
         .package(url: "https://github.com/vapor/fluent-sqlite-driver.git", from: "4.8.1"),
         // 🔵 Non-blocking, event-driven networking for Swift. Used for custom executors
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.83.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.92.0"),
         // ✈ A Swift wrapper for the Telegram API.
-        .package(url: "https://github.com/nerzh/swift-telegram-sdk", from: "3.9.4"),
+        .package(url: "https://github.com/nerzh/swift-telegram-sdk", from: "4.2.2"),
         // 🔑 A dotenv library for Swift.
         .package(url: "https://github.com/thebarndog/swift-dotenv.git", from: "2.1.0"),
         // 🗺️ Lingo-Vapor: A Swift package for language processing.
@@ -38,7 +38,7 @@ let package = Package(
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "NIOPosix", package: "swift-nio"),
-                .product(name: "SwiftTelegramSdk", package: "swift-telegram-sdk"),
+                .product(name: "SwiftTelegramBot", package: "swift-telegram-sdk"),
                 .product(name: "SwiftDotenv", package: "swift-dotenv"),
                 .product(name: "LingoVapor", package: "Lingo-Vapor")
             ],

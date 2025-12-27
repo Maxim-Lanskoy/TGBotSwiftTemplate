@@ -7,7 +7,7 @@
 
 import Foundation
 import Lingo
-@preconcurrency import SwiftTelegramSdk
+import SwiftTelegramBot
 
 struct Controllers {
     // MARK: - Controllers initialization.

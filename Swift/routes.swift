@@ -8,7 +8,7 @@
 import Fluent
 import Vapor
 @preconcurrency import Lingo
-@preconcurrency import SwiftTelegramSdk
+import SwiftTelegramBot
 
 // MARK: - Setting up Telegram Routes.
 actor RouterStore {
@@ -22,9 +22,15 @@ actor RouterStore {
         backStore[key]
     }
     
-    func process(key: String, update: TGUpdate, properties: [String: User], db: any Database, lingo: Lingo) async throws {
+    func process(key: String, update: TGUpdate, properties: [String: Int64], db: any Database, lingo: Lingo) async throws {
         guard let router = backStore[key] else { return }
-        try await router.process(update: update, properties: properties, db: db, lingo: lingo)
+        // Rehydrate Users from IDs inside actor to avoid passing non-Sendable models across actor boundary
+        var hydrated: [String: User] = [:]
+        for (k, v) in properties {
+            let user = try await sessionCache.getOrFetch(tgId: v, db: db)
+            hydrated[k] = user
+        }
+        try await router.process(update: update, properties: hydrated, db: db, lingo: lingo)
     }
 }
 

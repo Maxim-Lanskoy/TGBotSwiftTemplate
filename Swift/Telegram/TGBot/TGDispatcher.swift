@@ -5,126 +5,78 @@
 //  Created by Maxim Lanskoy on 13.06.2025.
 //
 
+import Vapor
 import Foundation
 import Logging
 import Fluent
-@preconcurrency import SwiftTelegramSdk
+import Lingo
+import LingoVapor
+import SwiftTelegramBot
 
-actor TGDispatcher: @preconcurrency TGDispatcherPrtcl {
+// MARK: - Main Unified Dispatcher
+
+final class TGDispatcher: TGDefaultDispatcher, @unchecked Sendable {
     
     private let db: any Database
-    private var log: Logger
-    private var handlersId: Int = 0
-    private var nextHandlerId: Int {
-        handlersId += 1
-        return handlersId
-    }
-    private var index: Int = 0
+    let lingoVapor: LingoProvider
 
-    public var handlersGroup: [[any TGHandlerPrtcl]] = []
-    private var routerHandlers: [String: [any TGHandlerPrtcl]] = [:]
-    private var handlersIndex: [Level: [IndexId: Position]] = .init()
-
-    private typealias Level = Int
-    private typealias IndexId = Int
-    private typealias Position = Int
-
-    public init(log: Logger, db: any Database) async throws {
-        self.log = log
-        self.db = db
-        try await handle()
+    init(bot: TGBot, app: Application) {
+        self.db = app.db
+        self.lingoVapor = app.lingoVapor
+        super.init(bot: bot, logger: app.logger)
     }
     
-    public func handle() async throws {}
+    override func handle() async {
+        // Register global commands controller
+        let globalCommands = GlobalCommandsController(
+            bot: bot,
+            db: db,
+            lingoVapor: lingoVapor
+        )
+        await globalCommands.registerHandlers(dispatcher: self)
 
-    public func add(_ handler: any TGHandlerPrtcl) async {
-        await add(handler, priority: 0)
+        // Register catch-all router handler
+        await addRouterHandler()
     }
     
-    public func add(_ handler: any TGHandlerPrtcl, priority: Int) async {
-        var handler: any TGHandlerPrtcl = handler
-        handler.id = nextHandlerId
-        var handlerPosition: Int = 0
-        let correctLevel: Int = priority >= 0 ? priority : 0
-        if handlersGroup.count > correctLevel {
-            self.handlersGroup[correctLevel].append(handler)
-            handlerPosition = handlersGroup[correctLevel].count - 1
-        } else {
-            handlersGroup.append([handler])
-            handlerPosition = handlersGroup[handlersGroup.count - 1].count - 1
-        }
-        if handlersIndex[priority] == nil { handlersIndex[priority] = .init() }
-        handlersIndex[priority]?[handler.id] = handlerPosition
-    }
+    // MARK: - Router Handler (Lowest Priority - Catch-all)
 
-    public func remove(_ handler: any TGHandlerPrtcl, from priority: Int?) async {
-        let priority: Level = priority ?? 0
-        let indexId: IndexId = handler.id
-        guard
-            let index: [IndexId: Position] = handlersIndex[priority],
-            let position: Position = index[indexId]
-        else {
-            return
-        }
-        let positionIndex = position - 1
-        let group = handlersGroup[priority]
-        if group.count > positionIndex, group[positionIndex].id == handler.id {
-            handlersGroup[priority].remove(at: positionIndex)
-            handlersIndex[priority]?.removeValue(forKey: indexId)
-        }
-    }
-    
-    public func add(_ handler: any TGHandlerPrtcl, routerName: String) {
-        var handler = handler
-        handler.id = nextHandlerId
-        if routerHandlers[routerName] == nil {
-            routerHandlers[routerName] = []
-        }
-        routerHandlers[routerName]?.append(handler)
-    }
+    private func addRouterHandler() async {
+        await add(TGBaseHandler({ [weak self] update in
+            guard let self = self else { return }
 
-    public func remove(_ handler: any TGHandlerPrtcl, from routerName: String) {
-        guard var handlers = routerHandlers[routerName] else { return }
-        if let idx = handlers.firstIndex(where: { $0.id == handler.id }) {
-            handlers.remove(at: idx)
-            routerHandlers[routerName] = handlers
-        }
-    }
+            let unsafeMessage = update.editedMessage?.from ?? update.message?.from
+            guard let entity = unsafeMessage ?? update.callbackQuery?.from else { return }
 
-    public func process(_ updates: [TGUpdate]) {
-        for update in updates {
-            Task.detached(priority: .high) { [log] in
-                do {
-                    try await self.processByHandler(update, db: self.db)
-                } catch {
-                    log.error("\(BotError(String(describing: error)))")
-                }
+            // Check authorization
+            if !allowedUsers.contains(entity.id) {
+                let concern = "[D20] Unauthorized user tried to access: \(entity.id), @\(entity.username ?? "\"No Username\"")."
+                print(concern)
+                let string = "Sorry, you are not allowed. Your user ID: \(entity.id). Please ask @SixPathsOfMax for an invite."
+                let chatId = TGChatId.chat(entity.id)
+                let ownerId = TGChatId.chat(owner)
+                let params = TGSendMessageParams(chatId: chatId, text: string, parseMode: .html)
+                let backup = TGSendMessageParams(chatId: ownerId, text: concern, parseMode: .html)
+                _ = try? await self.bot.sendMessage(params: params)
+                _ = try? await self.bot.sendMessage(params: backup)
+                return
             }
-        }
-    }
-    
-    private func processByHandler(_ update: TGUpdate, db: any Database) async throws {
-        log.trace("\(dump(update))")
-        // Process priority-based handlers as before
-        if handlersGroup.isEmpty { return }
-        for i in 1...handlersGroup.count {
-            for handler in handlersGroup[handlersGroup.count - i] {
-                if handler.check(update: update) {
-                    try await handler.handle(update: update)
-                }
-            }
-        }
-        // Process routerName handlers
-        let message = update.message?.from ?? update.editedMessage?.from
-        if let from = message ?? update.callbackQuery?.from {
-            let session = try await User.session(for: from, db: db)
-            if let handlers = routerHandlers[session.routerName] {
-                for handler in handlers {
-                    if handler.check(update: update) {
-                        try await handler.handle(update: update)
-                    }
-                }
-            }
-        }
+            
+            // Get user session with caching
+            let session = try await User.cachedSession(for: entity, db: self.db)
+            let lingo = try self.lingoVapor.lingo()
+
+            // Route to appropriate controller
+            let props: [String: Int64] = ["session": session.telegramId]
+            let key = session.routerName
+
+            try await store.process(
+                key: key,
+                update: update,
+                properties: props,
+                db: self.db,
+                lingo: lingo
+            )
+        }))
     }
 }

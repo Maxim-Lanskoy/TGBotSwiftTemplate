@@ -7,7 +7,7 @@
 
 import Foundation
 import Lingo
-@preconcurrency import SwiftTelegramSdk
+import SwiftTelegramBot
 
 enum Commands: String, Codable, CaseIterable {
     
@@ -24,7 +24,7 @@ enum Commands: String, Codable, CaseIterable {
     
     func buttonsForAllLocales(lingo: Lingo) -> [TGKeyboardButton] {
         var buttons: [TGKeyboardButton] = []
-        for locale in allSupportedLocales {
+        for locale in SupportedLocale.allCases {
             let localizedText = lingo.localize(self.rawValue, locale: locale)
             buttons.append(TGKeyboardButton(text: localizedText))
         }

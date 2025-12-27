@@ -8,7 +8,7 @@
 import Foundation
 import LingoVapor
 import Lingo
-@preconcurrency import SwiftTelegramSdk
+import SwiftTelegramBot
 
 // MARK: - Registrarion Controller Logic
 final class Registration: TGControllerBase, @unchecked Sendable {
@@ -27,16 +27,10 @@ final class Registration: TGControllerBase, @unchecked Sendable {
     public func onStart(context: Context) async throws -> Bool {
         var greeting = "👋 Welcome to TGBotSwiftTemplate bot!\n"
         var inlineKeyboard: [[TGInlineKeyboardButton]] = []
-        for locale in allSupportedLocales {
+        for locale in SupportedLocale.allCases {
             greeting.append("\n- \(context.lingo.localize("registration", locale: locale))")
-            let flag: String
-            switch locale {
-            case "en": flag = "🇬🇧"
-            case "ru-UA": flag = "🇺🇦"
-            default: flag = "🏳️"
-            }
             let langName = context.lingo.localize("lang.name", locale: locale)
-            let button = TGInlineKeyboardButton(text: "\(flag) \(langName)", callbackData: "set_lang:\(locale)")
+            let button = TGInlineKeyboardButton(text: "\(locale.flag()) \(langName)", callbackData: "set_lang:\(locale.rawValue)")
             inlineKeyboard.append([button])
         }
         let markup = TGReplyMarkup.inlineKeyboardMarkup(TGInlineKeyboardMarkup(inlineKeyboard: inlineKeyboard))
@@ -70,7 +64,7 @@ extension Registration {
         let mainController = Controllers.mainController
         context.session.locale = locale
         context.session.routerName = mainController.routerName
-        try await context.session.save(on: context.db)
+        try await context.session.saveAndCache(in: context.db)
         try await mainController.showMainMenu(context: context)
         return true
     }

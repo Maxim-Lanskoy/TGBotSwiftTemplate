@@ -1,8 +1,8 @@
 # Telegram Bot Swift Template 🤖
 
 [![Build Status](https://img.shields.io/badge/Build-Passing-brightgreen)](https://github.com/Maxim-Lanskoy/GPTGram/actions) 
-[![Swift](https://img.shields.io/badge/Swift-6.1-orange)](https://github.com/swiftlang/swift/releases/tag/swift-6.1-RELEASE) 
-[![Vapor](https://img.shields.io/badge/Vapor-4.115.0-mediumslateblue)](https://github.com/vapor/vapor/releases/tag/4.115.0) 
+[![Swift](https://img.shields.io/badge/Swift-6.2-orange)](https://github.com/swiftlang/swift/releases/tag/swift-6.2-RELEASE)
+[![Vapor](https://img.shields.io/badge/Vapor-4.120.0-mediumslateblue)](https://github.com/vapor/vapor/releases/tag/4.120.0) 
 
 A Telegram Bot template built with Swift, using a router-controller architecture, multiple languages, and database persistence.
 
@@ -19,7 +19,8 @@ This template provides a robust foundation for building Telegram bots in Swift w
 - **State-based navigation** using a router-controller pattern
 - **Multi-language support** with dynamic locale switching
 - **User session management** with SQLite database persistence
-- **Modern Swift concurrency** with actors and async/await
+- **Modern Swift concurrency** with async/await
+- **Session caching** for improved performance
 
 Perfect for creating bots that need to manage complex user interactions, multiple conversation states, and persistent data.
 
@@ -29,15 +30,16 @@ Perfect for creating bots that need to manage complex user interactions, multipl
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                        TGBotActor                           │
-│  (Manages bot instance and ensures thread-safe operations)  │
+│                     TGBot + Dispatcher                      │
+│    (Bot instance stored in Vapor Application storage)       │
 └─────────────────────────────────────────────────────────────┘
                                │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      Router System                          │
-│  (Maps updates to appropriate controllers based on state)   │
-└─────────────────────────────────────────────────────────────┘
+          ┌────────────────────┼────────────────────┐
+          ▼                    ▼                    ▼
+┌──────────────────┐ ┌──────────────────┐ ┌──────────────────┐
+│  Global Commands │ │   Router System  │ │  Session Cache   │
+│ (/help /settings)│ │ (State routing)  │ │ (Fast lookups)   │
+└──────────────────┘ └──────────────────┘ └──────────────────┘
                                │
                     ┌──────────┴──────────┐
                     ▼                     ▼
@@ -79,7 +81,7 @@ TGBotSwiftTemplate/
 │   │   ├── MainController.swift  # Main menu controller
 │   │   ├── RegistrationController.swift
 │   │   ├── SettingsController.swift
-│   │   └── XEverywhereController.swift  # Global command handlers
+│   │   └── GlobalCommandsController.swift  # Global command handlers
 │   │
 │   ├── Models/                   # Database models (Fluent ORM)
 │   │   └── User.swift           # User session and preferences
@@ -97,12 +99,14 @@ TGBotSwiftTemplate/
 │   │   │   └── Router+Helpers.swift
 │   │   │
 │   │   └── TGBot/               # Bot infrastructure
-│   │       ├── TGBotActor.swift # Thread-safe bot wrapper
-│   │       ├── TGDispatcher.swift
-│   │       └── VaporTGClient.swift # Vapor HTTP client adapter
+│   │       ├── BotService.swift  # Vapor Application extension
+│   │       ├── TGDispatcher.swift # Unified dispatcher
+│   │       └── VaporTGClient.swift # Vapor HTTP client for TG API
 │   │
 │   ├── Helpers/
 │   │   ├── TGBot+Extensions.swift # Convenience extensions
+│   │   ├── SessionCache.swift    # User session caching
+│   │   ├── Lingo+Locales.swift   # Locale type-safe extensions
 │   │   └── DotEnv+Env.swift      # Environment helpers
 │   │
 │   ├── entrypoint.swift         # Application entry point
@@ -111,7 +115,7 @@ TGBotSwiftTemplate/
 │
 ├── Localizations/               # Multi-language support
 │   ├── en.json                 # English translations
-│   └── ru-UA.json              # Ukrainian translations
+│   └── uk.json                 # Ukrainian translations
 │
 ├── SQLite/                      # Database files (gitignored)
 │   └── .gitkeep
@@ -129,8 +133,8 @@ TGBotSwiftTemplate/
 
 ### Prerequisites
 
-- **Swift 6.1+** toolchain
-- **Xcode 15+** (optional, for IDE support)
+- **Swift 6.2+** toolchain
+- **Xcode 16+** (optional, for IDE support)
 - **Telegram Bot Token** from [@BotFather](https://t.me/botfather)
 
 ### Installation
@@ -181,7 +185,7 @@ To get your Telegram user ID:
 ### User Flow
 
 1. **First Contact**: When a user messages the bot for the first time:
-   - `User.session()` creates a new user record
+   - `User.cachedSession()` creates a new user record (with caching)
    - User is routed to `RegistrationController`
    - Language selection is presented
 
@@ -228,7 +232,7 @@ To get your Telegram user ID:
 3. **Add navigation** from another controller:
    ```swift
    context.session.routerName = "myfeature"
-   try await context.session.save(on: context.db)
+   try await context.session.saveAndCache(in: context.db)
    ```
 
 ### Working with Keyboards
@@ -261,7 +265,7 @@ The template includes built-in multi-language support:
 
 3. **Add new language**:
    - Create new JSON file in `Localizations/`
-   - Add locale code to `allSupportedLocales` in `configure.swift`
+   - Add locale case to `SupportedLocale` enum in `configure.swift`
    - Update language selection UI in registration/settings
 
 ## 🔧 Configuration Options
@@ -276,7 +280,7 @@ The template includes built-in multi-language support:
 In `configure.swift`:
 - `owner`, `helper` - Admin user IDs
 - `allowedUsers` - Array of authorized user IDs (remove for public access)
-- `allSupportedLocales` - Available languages
+- `SupportedLocale` - Enum with available languages and their flags
 
 ### Database Options
 
@@ -295,7 +299,7 @@ app.databases.use(.postgres(configuration: ...), as: .psql)
 
 - **[Vapor](https://vapor.codes)** - Web framework and server
 - **[Fluent](https://docs.vapor.codes/fluent/overview/)** - ORM for database operations
-- **[SwiftTelegramSdk](https://github.com/nerzh/swift-telegram-sdk)** - Telegram Bot API client
+- **[SwiftTelegramBot](https://github.com/nerzh/swift-telegram-sdk)** - Telegram Bot API client
 - **[swift-dotenv](https://github.com/thebarndog/swift-dotenv)** - Environment file support
 - **[Lingo-Vapor](https://github.com/vapor-community/Lingo-Vapor)** - Localization support
 
@@ -317,24 +321,23 @@ router.add(.callback_query(data: "specific_action")) { context in
 
 ### Middleware-like Processing
 
-Use `XEverywhereController` for global command handling that works across all states:
+Use `GlobalCommandsController` for global command handling that works across all states:
 - `/help` - Always available
 - `/settings` - Accessible from anywhere
 - `/buttons` - Restore keyboard from any state
 
-### Actor-based Concurrency
+### Session Caching
 
-The bot uses Swift actors for thread-safe operations:
+The bot uses an actor-based cache for fast user session lookups:
 ```swift
-actor TGBotActor {
-    private var _bot: TGBot!
-    
-    var bot: TGBot { self._bot }
-    
-    func setBot(_ bot: TGBot) {
-        self._bot = bot
-    }
-}
+// Get cached session (creates new user if needed)
+let session = try await User.cachedSession(for: tgUser, db: db)
+
+// Save and update cache after modifications
+try await session.saveAndCache(in: db)
+
+// Invalidate cache entry if needed
+await session.invalidateCache()
 ```
 
 ## 🙏 Acknowledgments

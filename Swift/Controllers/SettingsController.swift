@@ -7,7 +7,7 @@
 
 import Foundation
 import Lingo
-@preconcurrency import SwiftTelegramSdk
+import SwiftTelegramBot
 
 // MARK: - Settings Controller Logic
 final class SettingsController: TGControllerBase, @unchecked Sendable {
@@ -38,7 +38,7 @@ final class SettingsController: TGControllerBase, @unchecked Sendable {
         let mainController = Controllers.mainController
         try await mainController.showMainMenu(context: context)
         context.session.routerName = mainController.routerName
-        try await context.session.save(on: context.db)
+        try await context.session.saveAndCache(in: context.db)
         return true
     }
     
@@ -54,15 +54,9 @@ final class SettingsController: TGControllerBase, @unchecked Sendable {
     private func onLanguage(context: Context) async throws -> Bool {
         let prompt = context.lingo.localize("settings.language.prompt", locale: context.session.locale)
         var inlineKeyboard: [[TGInlineKeyboardButton]] = []
-        for locale in allSupportedLocales {
-            let flag: String
-            switch locale {
-            case "en": flag = "🇬🇧"
-            case "ru-UA": flag = "🇺🇦"
-            default: flag = "🏳️"
-            }
+        for locale in SupportedLocale.allCases {
             let langName = context.lingo.localize("lang.name", locale: locale)
-            let button = TGInlineKeyboardButton(text: "\(flag) \(langName)", callbackData: "set_lang:\(locale)")
+            let button = TGInlineKeyboardButton(text: "\(locale.flag()) \(langName)", callbackData: "set_lang:\(locale.rawValue)")
             inlineKeyboard.append([button])
         }
         let markup = TGReplyMarkup.inlineKeyboardMarkup(TGInlineKeyboardMarkup(inlineKeyboard: inlineKeyboard))
@@ -108,7 +102,7 @@ extension SettingsController {
         guard let data = query.data, data.starts(with: "set_lang:") else { return false }
         let locale = data.replacingOccurrences(of: "set_lang:", with: "")
         context.session.locale = locale
-        try await context.session.save(on: context.db)
+        try await context.session.saveAndCache(in: context.db)
         try await Controllers.settingsController.showSettingsMenu(context: context)
         return true
     }
