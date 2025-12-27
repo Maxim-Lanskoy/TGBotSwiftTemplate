@@ -12,7 +12,7 @@ import SwiftTelegramBot
 
 let store = RouterStore()
 
-let owner: Int64          = 327887608 // 123456789
+let owner: Int64          = 123456789 // 123456789
 let helper: Int64         = 987654321 // 987654321
 let allowedUsers: [Int64] = [owner, helper]
 
