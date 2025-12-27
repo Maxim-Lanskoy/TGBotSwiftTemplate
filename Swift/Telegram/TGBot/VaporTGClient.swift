@@ -31,23 +31,26 @@ public final class VaporTGClient: TGClientPrtcl, Sendable {
         params: Params? = nil,
         as mediaType: HTTPMediaType? = nil
     ) async throws -> Response {
-        let clientResponse: ClientResponse = try await client.post(
-            URI(string: url.absoluteString),
-            headers: HTTPHeaders()
-        ) { clientRequest in
-            let vaporMediaType: Vapor.HTTPMediaType
-            if let mediaType {
-                vaporMediaType = .init(
-                    type: mediaType.type,
-                    subType: mediaType.subType,
-                    parameters: mediaType.parameters
-                )
+        var clientRequest = ClientRequest(method: .POST, url: URI(string: url.absoluteString), headers: HTTPHeaders())
+        if mediaType == .formData || mediaType == nil {
+            let rawMultipart: (body: NSMutableData, boundary: String)
+            if let currentParams: Params = params {
+                rawMultipart = try currentParams.toMultiPartFormData(log: logger)
             } else {
-                vaporMediaType = .formData
+                rawMultipart = try TGEmptyParams().toMultiPartFormData(log: logger)
+            }
+            clientRequest.headers.add(name: "Content-Type", value: "multipart/form-data; boundary=\(rawMultipart.boundary)")
+            let buffer = ByteBuffer.init(data: rawMultipart.body as Data)
+            clientRequest.body = buffer
+        } else {
+            let vaporMediaType: Vapor.HTTPMediaType = if let mediaType {
+                .init(type: mediaType.type, subType: mediaType.subType, parameters: mediaType.parameters)
+            } else {
+                .json
             }
             try clientRequest.content.encode(params ?? (TGEmptyParams() as! Params), as: vaporMediaType)
         }
-
+        let clientResponse: ClientResponse = try await client.send(clientRequest)
         let telegramContainer = try clientResponse.content.decode(TGTelegramContainer<Response>.self)
         return try processContainer(telegramContainer)
     }
